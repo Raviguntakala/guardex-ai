@@ -73,11 +73,12 @@ class LlamaGuardClassifier:
                     categories=self._policy.blocked_categories,
                 )
                 cr = ClassifyResult(
-                    safe=result.get("safe", True),
+                    safe=result.get("safe", False),
                     category=result.get("category"),
                     categories=result.get("categories", []),
                     confidence=result.get("confidence", 1.0),
                     description=result.get("description"),
+                    degraded=bool(result.get("_fail_open")),
                 )
             except Exception as e:
                 logger.warning(
@@ -86,9 +87,9 @@ class LlamaGuardClassifier:
                 )
                 if not self._policy.fail_open:
                     raise
-                cr = ClassifyResult(safe=True)
+                cr = ClassifyResult(safe=True, degraded=True)
 
-            # Worst-severity wins: any unsafe result trumps a safe one.
-            if not cr.safe and worst.safe:
+            # Worst-severity wins: an unsafe or unscreened result replaces a safe one.
+            if worst.safe and (not cr.safe or cr.degraded):
                 worst = cr
         return worst

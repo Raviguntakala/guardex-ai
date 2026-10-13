@@ -98,7 +98,7 @@ def classify_should_block(classify: dict, min_confidence: float) -> bool:
     ``classify_min_confidence`` is treated as safe so streaming and
     ``Guard.screen()`` agree.
     """
-    if classify.get("safe", True):
+    if classify.get("safe", False):
         return False
     if min_confidence > 0.0 and classify.get("confidence", 1.0) < min_confidence:
         return False

@@ -114,7 +114,7 @@ class LocalRunner:
                     "GuardEx classifier provider not registered - "
                     "fail_open=True, returning safe=True (content NOT screened)"
                 )
-                return {"safe": True, "category": None, "categories": [], "confidence": 1.0}
+                return {"safe": True, "category": None, "categories": [], "confidence": 1.0, "_fail_open": True}
             raise RuntimeError(
                 "GuardEx classifier not loaded. "
                 "pip install 'guardex-ai[local]' - or pass api_key=/base_url= for server mode."
@@ -122,7 +122,7 @@ class LocalRunner:
 
         raw = _run_async(provider.classify(text, stage=stage, categories=categories, cascade_mode=cascade_mode))
         return {
-            "safe": raw.get("safe", True),
+            "safe": raw.get("safe", False),
             "category": raw.get("category"),
             "categories": raw.get("categories", []),
             "confidence": raw.get("confidence", 1.0),
@@ -151,7 +151,7 @@ class LocalRunner:
                     "GuardEx PII provider not registered - "
                     "fail_open=True, returning has_pii=False (PII NOT scanned)"
                 )
-                return {"has_pii": False, "entities": [], "masked_text": text if mask else None}
+                return {"has_pii": False, "entities": [], "masked_text": text if mask else None, "_fail_open": True}
             raise RuntimeError(
                 "GuardEx PII detector not loaded. "
                 "pip install 'guardex-ai[local]' - or pass api_key=/base_url= for server mode."
@@ -219,7 +219,7 @@ class LocalRunner:
         )
         raw = _run_async(provider.check_scope(text, profile, alpha=alpha))
         return {
-            "allowed": raw.get("allowed", True),
+            "allowed": raw.get("allowed", False),
             "distance": raw.get("distance", 0.0),
             "matched_topic": raw.get("matched_topic"),
             "confidence": raw.get("confidence", 1.0),
@@ -451,7 +451,7 @@ class LocalRunner:
         """Scan text for PII. Returns raw pii dict (no masked_text)."""
         _ensure_providers()
         raw = self._pii_raw(text, entities=entities, threshold=threshold, mask=False)
-        return {"has_pii": raw["has_pii"], "entities": raw["entities"]}
+        return {k: raw[k] for k in ("has_pii", "entities", "_fail_open") if k in raw}
 
     def pii_mask(
         self,
