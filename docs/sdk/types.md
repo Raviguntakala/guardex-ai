@@ -94,6 +94,7 @@ class ClassifyResult:
     categories: list[str] = field(default_factory=list)  # All detected categories
     confidence: float = 1.0                # Classification confidence
     description: Optional[str] = None      # Human-readable category label
+    degraded: bool = False                 # True when returned via a fail-open path
 ```
 
 **Example:**
@@ -120,6 +121,7 @@ class PIIResult:
     has_pii: bool                          # Whether PII was detected
     entities: list[PIIEntity] = field(default_factory=list)  # Detected entities
     masked_text: Optional[str] = None      # Text with PII replaced (if masked)
+    degraded: bool = False                 # True when returned via a fail-open path
 ```
 
 **Example:**

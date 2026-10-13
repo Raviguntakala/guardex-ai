@@ -72,6 +72,8 @@ class ClassifyResult:
     categories: list[str] = field(default_factory=list)
     confidence: float = 1.0
     description: Optional[str] = None
+    degraded: bool = False
+    """True when no classification ran (fail-open); ``safe`` is then not a real verdict."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +82,8 @@ class PIIResult:
     has_pii: bool
     entities: list[PIIEntity] = field(default_factory=list)
     masked_text: Optional[str] = None
+    degraded: bool = False
+    """True when no PII scan ran (fail-open); ``has_pii`` is then not a real verdict."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -6,6 +6,22 @@ project tries to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-13
+
+### Security
+
+- A response with no verdict field is no longer read as a pass: a missing
+  `safe`, `allowed` or `grounded` reads as false, and a missing `has_pii` or
+  `has_contradiction` as true.
+- `ClassifyResult` and `PIIResult` gain `degraded`, set when `classify()`,
+  `pii_scan()` or `LlamaGuardClassifier` return through a fail-open path, and
+  on `screen()`'s classify and PII results. `screen()` now also sets
+  `ScreenResult.degraded` in local mode when a model did not load.
+- `screen()` blocks when PII is reported but no masked text came back, and
+  `pii_mask()` raises instead of returning the unmasked text. `pii_mask()`
+  on text without PII now returns the text (it returned `None` in local and
+  server mode).
+
 ## [0.2.0] - 2026-07-11
 
 ### Added

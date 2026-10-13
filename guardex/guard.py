@@ -60,7 +60,7 @@ from ._types import (
     Gate, ScreenResult, ClassifyResult, PIIResult, PIIEntity,
     ScopeResult, Action, GateTrace, gate_to_stage, output_gate_for,
 )
-from .exceptions import GuardExViolation
+from .exceptions import GuardExAPIError, GuardExViolation
 
 if TYPE_CHECKING:
     from ._types import GroundingResult
@@ -118,7 +118,7 @@ def _parse_grounding_result(
     details = [
         SentenceGroundingResult(
             sentence=s.get("sentence", ""),
-            grounded=s.get("grounded", True),
+            grounded=s.get("grounded", False),
             score=s.get("entailment", s.get("score", 1.0)),
             matched_chunk=s.get("matched_chunk"),
             verdict=s.get("verdict", "grounded"),
@@ -129,9 +129,9 @@ def _parse_grounding_result(
     ]
 
     return GroundingResult(
-        grounded=raw.get("grounded", True),
+        grounded=raw.get("grounded", False),
         faithfulness_score=raw.get("faithfulness_score", 1.0),
-        has_contradiction=raw.get("has_contradiction", False),
+        has_contradiction=raw.get("has_contradiction", True),
         sentence_count=raw.get("sentence_count", 0),
         grounded_count=raw.get("grounded_count", 0),
         contradicted_count=raw.get("contradicted_count", 0),
@@ -178,8 +178,8 @@ def _parse_screen_result(
         return ScreenResult(
             gate=gate,
             action="pass",
-            classify=ClassifyResult(safe=True),
-            pii=PIIResult(has_pii=False),
+            classify=ClassifyResult(safe=True, degraded=True),
+            pii=PIIResult(has_pii=False, degraded=True),
             text=original_text,
             request_id=request_id,
             gates_run=gates_run_t,
@@ -190,11 +190,12 @@ def _parse_screen_result(
     # Parse classification
     clf_data = raw.get("classify", {})
     classify = ClassifyResult(
-        safe=clf_data.get("safe", True),
+        safe=clf_data.get("safe", False),
         category=clf_data.get("category"),
         categories=clf_data.get("categories", []),
         confidence=clf_data.get("confidence", 1.0),
         description=clf_data.get("description"),
+        degraded=bool(clf_data.get("_fail_open")),
     )
 
     # Parse PII
@@ -210,9 +211,10 @@ def _parse_screen_result(
         for e in pii_data.get("entities", [])
     ]
     pii = PIIResult(
-        has_pii=pii_data.get("has_pii", False),
+        has_pii=pii_data.get("has_pii", True),
         entities=pii_entities,
         masked_text=pii_data.get("masked_text"),
+        degraded=bool(pii_data.get("_fail_open")),
     )
 
     # Parse scope
@@ -220,7 +222,7 @@ def _parse_screen_result(
     scope_data = raw.get("scope")
     if scope_data is not None:
         scope = ScopeResult(
-            allowed=scope_data.get("allowed", True),
+            allowed=scope_data.get("allowed", False),
             distance=scope_data.get("distance", 0.0),
             matched_topic=scope_data.get("matched_topic"),
             confidence=scope_data.get("confidence", 1.0),
@@ -249,7 +251,7 @@ def _parse_screen_result(
         action: Action = "block"
     elif not classify.safe:
         action = "block"
-    elif pii.has_pii and pii_action == "block":
+    elif pii.has_pii and (pii_action == "block" or not pii.masked_text or "text" not in raw):
         action = "block"
     elif pii.has_pii and pii.masked_text:
         action = "mask"
@@ -266,6 +268,7 @@ def _parse_screen_result(
         request_id=request_id,
         gates_run=gates_run_t,
         diagnostics=diagnostics_t,
+        degraded=classify.degraded or pii.degraded,
     )
 
 
@@ -738,9 +741,9 @@ class Guard:
             **classify_kwargs,
         )
         if raw.get("_fail_open"):
-            return ClassifyResult(safe=True)
+            return ClassifyResult(safe=True, degraded=True)
         return ClassifyResult(
-            safe=raw.get("safe", True),
+            safe=raw.get("safe", False),
             category=raw.get("category"),
             categories=raw.get("categories", []),
             confidence=raw.get("confidence", 1.0),
@@ -760,7 +763,7 @@ class Guard:
             threshold=policy.pii_threshold,
         )
         if raw.get("_fail_open"):
-            return PIIResult(has_pii=False)
+            return PIIResult(has_pii=False, degraded=True)
         entities = [
             PIIEntity(
                 text=e.get("text", ""),
@@ -771,7 +774,7 @@ class Guard:
             )
             for e in raw.get("entities", [])
         ]
-        return PIIResult(has_pii=raw.get("has_pii", False), entities=entities)
+        return PIIResult(has_pii=raw.get("has_pii", True), entities=entities)
 
     def pii_mask(
         self,
@@ -785,7 +788,17 @@ class Guard:
             entities=policy.pii_entities,
             threshold=policy.pii_threshold,
         )
-        return raw.get("masked_text", text)
+        masked = raw.get("masked_text")
+        if masked is not None:
+            return masked
+        if raw.get("has_pii") is False:
+            return text
+        raise GuardExAPIError(
+            status_code=502,
+            error_type="invalid_response",
+            message="Response has no masked_text. Run a guardex-server that matches this SDK version.",
+            code="missing_masked_text",
+        )
 
     def screen_batch(
         self,

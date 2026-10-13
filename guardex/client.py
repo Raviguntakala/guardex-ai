@@ -258,7 +258,7 @@ class GuardExClient:
         body, request_id = self._request("POST", "/v1/classify", json=payload,
                                          extra_headers=extra_headers)
         if body.get("_fail_open"):
-            return {"safe": True, "category": None, "categories": [], "_request_id": None}
+            return {"safe": True, "category": None, "categories": [], "_request_id": None, "_fail_open": True}
         if request_id:
             body["_request_id"] = request_id
         return body
@@ -281,7 +281,7 @@ class GuardExClient:
         body, _ = self._request("POST", "/v1/pii/scan", json=payload,
                                 extra_headers=extra_headers)
         if body.get("_fail_open"):
-            return {"has_pii": False, "entities": []}
+            return {"has_pii": False, "entities": [], "_fail_open": True}
         return body
 
     def pii_mask(

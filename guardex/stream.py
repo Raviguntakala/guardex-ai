@@ -162,7 +162,7 @@ class StreamGuard:
         # Topic scope is reported in a separate `scope` object, not in
         # `classify.safe`; enforce it here to match Guard.screen().
         scope = result.get("scope")
-        if scope is not None and not scope.get("allowed", True):
+        if scope is not None and not scope.get("allowed", False):
             logger.warning(
                 "StreamGuard blocked at gate=%s: out of topic scope after %d chars",
                 self._gate, self._total_screened,
@@ -289,7 +289,7 @@ class AsyncStreamGuard:
         # Topic scope is reported in a separate `scope` object, not in
         # `classify.safe`; enforce it here to match Guard.screen().
         scope = result.get("scope")
-        if scope is not None and not scope.get("allowed", True):
+        if scope is not None and not scope.get("allowed", False):
             logger.warning(
                 "AsyncStreamGuard blocked at gate=%s: out of topic scope after %d chars",
                 self._gate, self._total_screened,
